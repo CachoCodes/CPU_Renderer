@@ -1,6 +1,16 @@
 #include <windows.h>
 #include <cstdint>
+#include <cmath>
+#include <algorithm>
+#include <iostream>
+#include <chrono>
+
+int frames = 0;
+float fps = 0.0f;
+auto lastTime = std::chrono::high_resolution_clock::now();
+
 #include "renderer.hpp"
+
 
 BITMAPINFO bitmapInfo{};
 
@@ -73,11 +83,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 
     RENDERLOOP(framebuffer, winSize);
 
+    frames++;
+
+    auto now = std::chrono::high_resolution_clock::now();
+    float elapsed = std::chrono::duration<float>(now - lastTime).count();
+
+    if (elapsed >= 1.0f) {
+        fps = frames / elapsed;
+        frames = 0;
+        lastTime = now;
+    }
+
     HDC hdc = GetDC(hwnd);
+
+    char title[64];
+    std::sprintf(title, "CPU Renderer - %.f FPS", fps);
+    SetWindowTextA(hwnd, title);
 
     StretchDIBits(hdc, 0, 0, winSize.x, winSize.y, 0, 0, winSize.x, winSize.y, framebuffer, &bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
 
     ReleaseDC(hwnd, hdc);
+
+
 }
 
     delete[] framebuffer;
