@@ -1,36 +1,37 @@
 #include <windows.h>
 #include <cstdint>
+#include <cstdio>
+#include <chrono>
 #include <cmath>
 #include <algorithm>
-#include <iostream>
-#include <chrono>
-
-int frames = 0;
-float fps = 0.0f;
-auto lastTime = std::chrono::high_resolution_clock::now();
-
 #include "renderer.hpp"
 
 
-BITMAPINFO bitmapInfo{};
+int frames = 0;
+float fps = 0.0f;
+auto last_time = std::chrono::high_resolution_clock::now();
 
-void resizeFramebuffer(int newWidth, int newHeight) {
-    if (newWidth <= 0 || newHeight <= 0) return;
+BITMAPINFO bitmap_info{};
 
-    winSize.x = newWidth;
-    winSize.y = newHeight;
+
+void resize_framebuffer(int new_width, int new_height) {
+    if (new_width <= 0 || new_height <= 0) return;
+
+    win_size.x = new_width;
+    win_size.y = new_height;
 
     delete[] framebuffer;
-    framebuffer = new uint32_t[winSize.x * winSize.y];
+    framebuffer = new uint32_t[win_size.x * win_size.y];
 
-    bitmapInfo.bmiHeader.biWidth = winSize.x;
-    bitmapInfo.bmiHeader.biHeight = -winSize.y;
+    bitmap_info.bmiHeader.biWidth = win_size.x;
+    bitmap_info.bmiHeader.biHeight = -win_size.y;
 }
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+
+LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_SIZE:
-            resizeFramebuffer(LOWORD(lParam), HIWORD(lParam));
+            resize_framebuffer(LOWORD(lParam), HIWORD(lParam));
             return 0;
 
         case WM_CLOSE:
@@ -46,68 +47,110 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     }
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
-    WNDCLASS wc{};
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hInstance;
-    wc.lpszClassName = "CPURenderer";
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 
-    RegisterClass(&wc);
+int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int) {
+    WNDCLASSA window_class{};
 
-    HWND hwnd = CreateWindowEx(0, "CPURenderer", "CPURenderer", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, winSize.x, winSize.y, nullptr, nullptr, hInstance, nullptr);
+    window_class.lpfnWndProc = window_proc;
+    window_class.hInstance = h_instance;
+    window_class.lpszClassName = "CPU_Renderer";
+    window_class.hCursor = LoadCursor(nullptr, IDC_ARROW);
 
-    if (!hwnd) return 0;
+    if (!RegisterClassA(&window_class)) {
+        return 0;
+    }
+
+
+    HWND hwnd = CreateWindowExA(
+        0,
+        "CPU_Renderer",
+        "CPU Renderer",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT,
+        CW_USEDEFAULT,
+        win_size.x,
+        win_size.y,
+        nullptr,
+        nullptr,
+        h_instance,
+        nullptr
+    );
+
+    if (!hwnd) {
+        return 0;
+    }
+
+
+    bitmap_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmap_info.bmiHeader.biPlanes = 1;
+    bitmap_info.bmiHeader.biBitCount = 32;
+    bitmap_info.bmiHeader.biCompression = BI_RGB;
+
+    resize_framebuffer(win_size.x, win_size.y);
 
     ShowWindow(hwnd, SW_SHOW);
 
-    bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bitmapInfo.bmiHeader.biWidth = winSize.x;
-    bitmapInfo.bmiHeader.biHeight = -winSize.y;
-    bitmapInfo.bmiHeader.biPlanes = 1;
-    bitmapInfo.bmiHeader.biBitCount = 32;
-    bitmapInfo.bmiHeader.biCompression = BI_RGB;
-
-    resizeFramebuffer(winSize.x, winSize.y);
 
     bool running = true;
 
-   while (running) {
-    MSG msg;
+    while (running) {
+        MSG msg{};
 
-    while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        if (msg.message == WM_QUIT) running = false;
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) {
+                running = false;
+                break;
+            }
+
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        if (!running) {
+            break;
+        }
+
+
+        render_loop(framebuffer, win_size);
+
+
+        frames++;
+
+        auto now = std::chrono::high_resolution_clock::now();
+        float elapsed = std::chrono::duration<float>(now - last_time).count();
+
+        if (elapsed >= 1.0f) {
+            fps = frames / elapsed;
+            frames = 0;
+            last_time = now;
+        }
+
+
+        char title[64];
+        std::snprintf(title, sizeof(title), "CPU Renderer - %.0f FPS", fps);
+        SetWindowTextA(hwnd, title);
+
+
+        HDC hdc = GetDC(hwnd);
+
+        StretchDIBits(
+            hdc,
+            0, 0,
+            win_size.x, win_size.y,
+            0, 0,
+            win_size.x, win_size.y,
+            framebuffer,
+            &bitmap_info,
+            DIB_RGB_COLORS,
+            SRCCOPY
+        );
+
+        ReleaseDC(hwnd, hdc);
     }
 
-    RENDERLOOP(framebuffer, winSize);
-
-    frames++;
-
-    auto now = std::chrono::high_resolution_clock::now();
-    float elapsed = std::chrono::duration<float>(now - lastTime).count();
-
-    if (elapsed >= 1.0f) {
-        fps = frames / elapsed;
-        frames = 0;
-        lastTime = now;
-    }
-
-    HDC hdc = GetDC(hwnd);
-
-    char title[64];
-    std::sprintf(title, "CPU Renderer - %.f FPS", fps);
-    SetWindowTextA(hwnd, title);
-
-    StretchDIBits(hdc, 0, 0, winSize.x, winSize.y, 0, 0, winSize.x, winSize.y, framebuffer, &bitmapInfo, DIB_RGB_COLORS, SRCCOPY);
-
-    ReleaseDC(hwnd, hdc);
-
-
-}
 
     delete[] framebuffer;
+    framebuffer = nullptr;
 
     return 0;
 }
