@@ -1,3 +1,7 @@
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+
 struct vector2d {
     int x, y;
 };
@@ -98,27 +102,50 @@ inline fragment_shader_data init_fragment_shader(vertex v1, vertex v2, vertex v3
     v1.color.r = static_cast<uint8_t>(v1.color.r * barycentric.x);
     v1.color.g = static_cast<uint8_t>(v1.color.g * barycentric.x);
     v1.color.b = static_cast<uint8_t>(v1.color.b * barycentric.x);
+    v1.u = (v1.u * barycentric.x);
+    v1.v = (v1.v * barycentric.x);
 
     v2.color.r = static_cast<uint8_t>(v2.color.r * barycentric.y);
     v2.color.g = static_cast<uint8_t>(v2.color.g * barycentric.y);
     v2.color.b = static_cast<uint8_t>(v2.color.b * barycentric.y);
+    v2.u = (v2.u * barycentric.y);
+    v2.v = (v2.v * barycentric.y);
+
 
     v3.color.r = static_cast<uint8_t>(v3.color.r * barycentric.z);
     v3.color.g = static_cast<uint8_t>(v3.color.g * barycentric.z);
     v3.color.b = static_cast<uint8_t>(v3.color.b * barycentric.z);
+    v3.u = (v3.u * barycentric.z);
+    v3.v = (v3.v * barycentric.z);
 
-    return {v1, v2, v3};
+    return fragment_shader_data{v1, v2, v3};
 }
 
+
+int width, height, channels;
+unsigned char* image;
 inline argb_color fragment_shader(const fragment_shader_data& data) {
-    return {
-        255,
-        static_cast<uint8_t>(data.v1.color.r + data.v2.color.r + data.v3.color.r),
-        static_cast<uint8_t>(data.v1.color.g + data.v2.color.g + data.v3.color.g),
-        static_cast<uint8_t>(data.v1.color.b + data.v2.color.b + data.v3.color.b)
-    };
-}
+    argb_color frag_color;
+    //Convertir en texture() tipo OpenGL
+    //Hacer q tmb pueda multiplicar por el color
+    float u = data.v1.u + data.v2.u + data.v3.u;
+    float v = data.v1.v + data.v2.v + data.v3.v;
 
+    int x = static_cast<int>(u * width);
+    int y = static_cast<int>(v * height);
+
+    x = std::max(0, std::min(x, width - 1));
+    y = std::max(0, std::min(y, height - 1));
+
+    int index = (y * width + x) * 3;
+
+
+    frag_color.a = 255;
+    frag_color.r = image[index + 0];
+    frag_color.g = image[index + 1];
+    frag_color.b = image[index + 2];
+    return frag_color;
+}
 
 inline uint32_t argb_color_to_uint32(argb_color color) {
     return (static_cast<uint32_t>(color.a) << 24) |
@@ -173,15 +200,30 @@ void draw_triangle(uint32_t* framebuffer, vector2d win_size, const vertex& p0, c
     }
 }
 
+void init_render(){
+    debug_draw_line(false);
+
+    stbi_set_flip_vertically_on_load(true);
+    image = stbi_load("image.png", &width, &height, &channels, 3);
+
+    if (!image) {
+        std::cout << stbi_failure_reason() << "\n";
+        throw std::runtime_error("shit");
+    }
+
+    char buffer[128];
+    std::snprintf(buffer, sizeof(buffer), "OK: %dx%d channels=%d\n", width, height, channels);
+    OutputDebugStringA(buffer);
+}
 
 void render_loop(uint32_t* framebuffer, vector2d win_size) {
-    fill_rect(framebuffer, win_size, 0xFF000000);
-    debug_draw_line(false);
+    
+    fill_rect(framebuffer, win_size, 0x0000000);
     vertex v1 = {{-0.5f, -0.5f, 0.0f}, {255, 255, 0, 0}, 0.0f, 0.0f};
-    vertex v2 = {{0.0f, 0.5f, 0.0f}, {255, 0, 255, 0}, 0.5f, 0.5f};
-    vertex v3 = {{0.5f, -0.5f, 0.0f}, {255, 0, 0, 255}, 1.0f, 1.0f};
+    vertex v2 = {{0.0f, 0.5f, 0.0f}, {255, 0, 255, 0}, 0.5f, 1.0f};
+    vertex v3 = {{0.5f, -0.5f, 0.0f}, {255, 0, 0, 255}, 1.0f, 0.0f};
     draw_triangle(framebuffer,win_size,
         v1,v2,v3,
-        0xFF00FF00
+        0xFF0000FF //Debug Color 
     );
 }

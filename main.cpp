@@ -3,7 +3,10 @@
 #include <cstdio>
 #include <chrono>
 #include <cmath>
+#include <iostream> 
 #include <algorithm>
+#include <stdexcept>
+#include <string>
 #include "renderer.hpp"
 
 
@@ -93,6 +96,15 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int) {
 
     bool running = true;
 
+    init_render();
+
+    if(debug_mode){
+        AllocConsole();
+        FILE* fp;
+        freopen_s(&fp, "CONOUT$", "w", stdout);
+        freopen_s(&fp, "CONOUT$", "w", stderr);
+        freopen_s(&fp, "CONIN$", "r", stdin);
+    }
     while (running) {
         MSG msg{};
 
