@@ -13,9 +13,9 @@
 int frames = 0;
 float fps = 0.0f;
 auto last_time = std::chrono::high_resolution_clock::now();
+float delta = 0.f;
 
 BITMAPINFO bitmap_info{};
-
 
 void resize_framebuffer(int new_width, int new_height) {
     if (new_width <= 0 || new_height <= 0) return;
@@ -105,6 +105,7 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int) {
         freopen_s(&fp, "CONOUT$", "w", stderr);
         freopen_s(&fp, "CONIN$", "r", stdin);
     }
+
     while (running) {
         MSG msg{};
 
