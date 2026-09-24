@@ -134,12 +134,11 @@ A window opens showing the textured pyramid rotating. The FPS shows in the title
 
 A pyramid (square base, four triangular sides) rotating around the Y and X axes at 60 degrees per second. Each face shows the full texture.
 
-<!-- PICTURE SLOT 8 — optional: annotated screenshot pointing at the window, title bar FPS, and the pyramid -->
-
 ### Controls
 
 | Action | Result |
-| Press "D" | See Depth Buffer |
+| --- | --- |
+| Press **D** | Toggle the depth buffer view |
 | Resize the window | Framebuffer and depth buffer are recreated; aspect ratio updates automatically |
 | Close the window | Exits cleanly |
 
