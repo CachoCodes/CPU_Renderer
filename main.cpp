@@ -1,4 +1,6 @@
 #include <windows.h>
+#include <vector>
+#include <functional>
 #include <cstdint>
 #include <cstdio>
 #include <chrono>
@@ -7,13 +9,16 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
-#include "renderer.hpp"
-
-
 int frames = 0;
 float fps = 0.0f;
 auto last_time = std::chrono::high_resolution_clock::now();
 float delta = 0.f;
+constexpr float PI = 3.14159f;
+
+#include "renderer.hpp"
+
+
+
 
 BITMAPINFO bitmap_info{};
 
@@ -25,6 +30,9 @@ void resize_framebuffer(int new_width, int new_height) {
 
     delete[] framebuffer;
     framebuffer = new uint32_t[win_size.x * win_size.y];
+
+    delete[] depth_buffer;
+    depth_buffer = new float[win_size.x * win_size.y]; // <- nuevo
 
     bitmap_info.bmiHeader.biWidth = win_size.x;
     bitmap_info.bmiHeader.biHeight = -win_size.y;
@@ -106,6 +114,9 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int) {
         freopen_s(&fp, "CONIN$", "r", stdin);
     }
 
+    auto last_frame_time = std::chrono::high_resolution_clock::now();
+    auto fps_time = last_frame_time;
+
     while (running) {
         MSG msg{};
 
@@ -123,42 +134,49 @@ int WINAPI WinMain(HINSTANCE h_instance, HINSTANCE, LPSTR, int) {
             break;
         }
 
+        auto frame_start = std::chrono::high_resolution_clock::now();
+
+        delta = std::chrono::duration<float>(frame_start - last_frame_time).count();
+
+        last_frame_time = frame_start;
 
         render_loop(framebuffer, win_size);
-
 
         frames++;
 
         auto now = std::chrono::high_resolution_clock::now();
-        float elapsed = std::chrono::duration<float>(now - last_time).count();
 
-        if (elapsed >= 1.0f) {
-            fps = frames / elapsed;
-            frames = 0;
-            last_time = now;
-        }
+    float elapsed = std::chrono::duration<float>(
+        now - fps_time
+    ).count();
 
+    if (elapsed >= 1.0f) {
+        fps = frames / elapsed;
+        frames = 0;
+        fps_time = now;
 
         char title[64];
-        std::snprintf(title, sizeof(title), "CPU Renderer - %.0f FPS", fps);
+        std::snprintf(title, sizeof(title),
+            "CPU Renderer - %.0f FPS", fps);
+
         SetWindowTextA(hwnd, title);
+    }
 
+    HDC hdc = GetDC(hwnd);
 
-        HDC hdc = GetDC(hwnd);
+    StretchDIBits(
+        hdc,
+        0, 0,
+        win_size.x, win_size.y,
+        0, 0,
+        win_size.x, win_size.y,
+        framebuffer,
+        &bitmap_info,
+        DIB_RGB_COLORS,
+        SRCCOPY
+    );
 
-        StretchDIBits(
-            hdc,
-            0, 0,
-            win_size.x, win_size.y,
-            0, 0,
-            win_size.x, win_size.y,
-            framebuffer,
-            &bitmap_info,
-            DIB_RGB_COLORS,
-            SRCCOPY
-        );
-
-        ReleaseDC(hwnd, hdc);
+    ReleaseDC(hwnd, hdc);
     }
 
 

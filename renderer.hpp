@@ -1,29 +1,24 @@
 #define STB_IMAGE_IMPLEMENTATION
-constexpr float PI = 3.14159f;
 #include "stb_image.h"
-
+ 
 struct mat4
 {
     float m[4][4];
 
     static mat4 zero()
     {
-        return mat4{{
-            {0.0f, 0.0f, 0.0f, 0.0f},
-            {0.0f, 0.0f, 0.0f, 0.0f},
-            {0.0f, 0.0f, 0.0f, 0.0f},
-            {0.0f, 0.0f, 0.0f, 0.0f}
-        }};
+        return mat4{{{0.0f, 0.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f, 0.0f}}};
     }
 
     static mat4 identity()
     {
-        return mat4{{
-            {1.0f, 0.0f, 0.0f, 0.0f},
-            {0.0f, 1.0f, 0.0f, 0.0f},
-            {0.0f, 0.0f, 1.0f, 0.0f},
-            {0.0f, 0.0f, 0.0f, 1.0f}
-        }};
+        return mat4{{{1.0f, 0.0f, 0.0f, 0.0f},
+                     {0.0f, 1.0f, 0.0f, 0.0f},
+                     {0.0f, 0.0f, 1.0f, 0.0f},
+                     {0.0f, 0.0f, 0.0f, 1.0f}}};
     }
 
     mat4 operator*(const mat4 &other) const
@@ -125,9 +120,8 @@ struct mat4
         matrix.m[1][1] = 1.0f / tan_half_fov;
 
         matrix.m[2][2] = far_plane / (far_plane - near_plane);
-        matrix.m[2][3] = (-far_plane * near_plane) / (far_plane - near_plane);
-
-        matrix.m[3][2] = 1.0f;
+        matrix.m[2][3] = 1.0f;
+        matrix.m[3][2] = (-far_plane * near_plane) / (far_plane - near_plane);
 
         return matrix;
     }
@@ -172,8 +166,7 @@ struct vec3f
         return {
             y * o.z - z * o.y,
             z * o.x - x * o.z,
-            x * o.y - y * o.x
-        };
+            x * o.y - y * o.x};
     }
 
     vec3f transform(const mat4 &mat) const
@@ -235,10 +228,16 @@ struct fragment_shader_data
     uint8_t b;
 };
 
+struct task {
+        float priority;
+        std::function<void()> function;
+};
+
 
 bool debug_mode = true;
 
 uint32_t *framebuffer = nullptr;
+float *depth_buffer = nullptr;
 vec2i win_size = {800, 600};
 
 inline vec2i normalize_to_screen(vec3f p, vec2i win_size)
@@ -362,10 +361,11 @@ inline argb_color fragment_shader(const fragment_shader_data &data)
     argb_color frag_color;
 
     frag_color = texture_mapping({data.u, data.v}, image, width, height);
-    frag_color.r = (frag_color.r * data.r) / 255;
-    frag_color.g = (frag_color.g * data.g) / 255;
-    frag_color.b = (frag_color.b * data.b) / 255;
+    // frag_color.r = (frag_color.r * data.r) / 255;
+    // frag_color.g = (frag_color.g * data.g) / 255;
+    // frag_color.b = (frag_color.b * data.b) / 255;
 
+    // frag_color = {255, data.r,data.g,data.b};
     return frag_color;
 }
 
@@ -377,53 +377,15 @@ inline uint32_t argb_color_to_uint32(argb_color color)
            static_cast<uint32_t>(color.b);
 }
 
+
+
 void draw_triangle(uint32_t *framebuffer, vec2i win_size, const vertex &p0, const vertex &p1, const vertex &p2, uint32_t color)
 {
     if (debug_mode)
     {
-        //FIX FIX FIX FIX FIX FIX 
-        /*
         draw_line(framebuffer, win_size, p0.position, p1.position, color);
         draw_line(framebuffer, win_size, p1.position, p2.position, color);
         draw_line(framebuffer, win_size, p2.position, p0.position, color);
-        */
-       vec2i a = normalize_to_screen(p0.position, win_size);
-        vec2i b = normalize_to_screen(p1.position, win_size);
-        vec2i c = normalize_to_screen(p2.position, win_size);
-
-        float area = edge_function(a, b, c);
-        if (area == 0.0f)
-            return;
-
-        int min_x = std::max(0, std::min({a.x, b.x, c.x}));
-        int max_x = std::min(win_size.x - 1, std::max({a.x, b.x, c.x}));
-        int min_y = std::max(0, std::min({a.y, b.y, c.y}));
-        int max_y = std::min(win_size.y - 1, std::max({a.y, b.y, c.y}));
-
-        float inverse_area = 1.0f / area;
-        for (int y = min_y; y <= max_y; y++)
-        {
-            for (int x = min_x; x <= max_x; x++)
-            {
-                vec2i p = {x, y};
-
-                float w0 = edge_function(b, c, p) * inverse_area;
-                float w1 = edge_function(c, a, p) * inverse_area;
-                float w2 = edge_function(a, b, p) * inverse_area;
-
-                if (!((w0 >= 0.6f && w1 >= 0.6f && w2 >= 0.6f) ||
-                    (w0 >= 0.6f && w1 >= 0.6f && w2 >= 0.6f)))
-                {
-                    continue;
-                }
-
-                vec3f barycentric = {w0, w1, w2};
-                fragment_shader_data shader_data = init_fragment_shader(p0, p1, p2, barycentric);
-                argb_color fragment_color = fragment_shader(shader_data);
-
-                framebuffer[y * win_size.x + x] = argb_color_to_uint32(fragment_color);
-            }
-        }
         return;
     }
 
@@ -459,18 +421,66 @@ void draw_triangle(uint32_t *framebuffer, vec2i win_size, const vertex &p0, cons
                 continue;
             }
 
+            // --- test de profundidad ---
+            float depth = w0 * p0.position.z + w1 * p1.position.z + w2 * p2.position.z;
+
+            int idx = y * win_size.x + x;
+            if (depth >= depth_buffer[idx])
+                continue; // ya hay algo más cerca dibujado en este pixel
+
+            depth_buffer[idx] = depth;
+
             vec3f barycentric = {w0, w1, w2};
             fragment_shader_data shader_data = init_fragment_shader(p0, p1, p2, barycentric);
             argb_color fragment_color = fragment_shader(shader_data);
 
-            framebuffer[y * win_size.x + x] = argb_color_to_uint32(fragment_color);
+            framebuffer[idx] = argb_color_to_uint32(fragment_color);
         }
+    }
+}
+
+
+void visualize_depth_buffer(uint32_t *framebuffer, vec2i win_size)
+{
+    int count = win_size.x * win_size.y;
+
+    float min_depth = 1e9f;
+    float max_depth = -1e9f;
+
+    for (int i = 0; i < count; i++)
+    {
+        float d = depth_buffer[i];
+        if (d >= 1e9f) continue; 
+        min_depth = std::min(min_depth, d);
+        max_depth = std::max(max_depth, d);
+    }
+
+    float range = max_depth - min_depth;
+    if (range <= 0.0f) range = 1.0f;
+
+    for (int i = 0; i < count; i++)
+    {
+        float d = depth_buffer[i];
+
+        uint8_t gray;
+        if (d >= 1e9f)
+        {
+            gray = 0; 
+        }
+        else
+        {
+            float t = (d - min_depth) / range; 
+            gray = static_cast<uint8_t>((1.0f - t) * 255.0f); 
+        }
+
+        argb_color c = {255, gray, gray, gray};
+        framebuffer[i] = argb_color_to_uint32(c);
     }
 }
 
 void init_render()
 {
-    debug_draw_line(true);
+    debug_draw_line(false);
 
     stbi_set_flip_vertically_on_load(true);
     image = stbi_load("image.png", &width, &height, &channels, 3);
@@ -486,14 +496,73 @@ void init_render()
     OutputDebugStringA(buffer);
 }
 
+inline void clear_z_buffer(){
+    std::fill(depth_buffer, depth_buffer + win_size.x * win_size.y, 1e9f);
+}
+
 void render_loop(uint32_t *framebuffer, vec2i win_size)
 {
+    clear_z_buffer();
+    fill_rect(framebuffer, win_size, 0x00000000);
 
-    fill_rect(framebuffer, win_size, 0x0000000);
-    vertex v1 = {{-0.5f, -0.5f, 0.0f}, {255, 255, 0, 0}, 0.0f, 0.0f};
-    vertex v2 = {{0.5f, 0.5f, 0.0f}, {255, 0, 255, 0}, 1.0f, 1.0f};
-    vertex v3 = {{0.5f, -0.5f, 0.0f}, {255, 0, 0, 255}, 1.0f, 0.0f};
-    vertex v4 = {{-0.5f, 0.5f, 0.0f}, {255, 255, 255, 0}, 0.0f, 1.0f};
-    draw_triangle(framebuffer, win_size, v1, v2, v3, 0xFF0000FF);
-    draw_triangle(framebuffer, win_size, v1, v2, v4, 0xFF0000FF);
+    vertex t_apex_front = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
+    vertex t_b1_front = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 255},0.0f,1.0f};
+    vertex t_b2_front = {{0.5f, -0.5f, -0.5f},{255, 255, 255, 255},1.0f,1.0f};
+    vertex t_apex_right = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
+    vertex t_b2_right = {{0.5f, -0.5f, -0.5f},{255, 255, 255, 255},0.0f,1.0f};
+    vertex t_b3_right = {{0.5f, -0.5f, 0.5f},{255, 255, 255, 255},1.0f,1.0f};
+    vertex t_apex_back = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
+    vertex t_b3_back = {{0.5f, -0.5f, 0.5f},{255, 255, 255, 255},0.0f,1.0f};
+    vertex t_b4_back = {{-0.5f, -0.5f, 0.5f},{255, 255, 255, 255},1.0f,1.0f};
+    vertex t_apex_left = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
+    vertex t_b4_left = {{-0.5f, -0.5f, 0.5f},{255, 255, 255, 255},0.0f,1.0f};
+    vertex t_b1_left = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 255},1.0f,1.0f};
+    vertex t_b1_base = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 255},0.0f,0.0f};
+    vertex t_b2_base = {{0.5f, -0.5f, -0.5f},{255, 255, 255, 255},1.0f,0.0f};
+    vertex t_b3_base = {{0.5f, -0.5f, 0.5f},{255, 255, 255, 255},1.0f,1.0f};
+    vertex t_b4_base = {{-0.5f, -0.5f, 0.5f}, {255, 255, 255, 255}, 0.0f, 1.0f};
+
+    static float angle = 0.0f;
+    angle += 60.0f * delta;
+
+    if (angle >= 360.0f) angle -= 360.0f;
+
+    mat4 model = mat4::rotate_y(angle) * mat4::rotate_x(angle);
+    mat4 view = mat4::translate(0.0f,0.0f,2.0f);
+    float aspect = static_cast<float>(win_size.x) /static_cast<float>(win_size.y);
+    mat4 proj = mat4::perspective(60.0f,aspect,0.1f,100.0f);
+    mat4 mvp = model * view * proj;
+
+    auto xform = [&](vertex v) -> vertex{
+        v.position = v.position.transform(mvp);
+        return v;
+    };
+    // Frente
+    t_apex_front = xform(t_apex_front);
+    t_b1_front = xform(t_b1_front);
+    t_b2_front = xform(t_b2_front);
+    // Derecha
+    t_apex_right = xform(t_apex_right);
+    t_b2_right = xform(t_b2_right);
+    t_b3_right = xform(t_b3_right);
+    // Atrás
+    t_apex_back = xform(t_apex_back);
+    t_b3_back = xform(t_b3_back);
+    t_b4_back = xform(t_b4_back);
+    // Izquierda
+    t_apex_left = xform(t_apex_left);
+    t_b4_left = xform(t_b4_left);
+    t_b1_left = xform(t_b1_left);
+    // Base
+    t_b1_base = xform(t_b1_base);
+    t_b2_base = xform(t_b2_base);
+    t_b3_base = xform(t_b3_base);
+    t_b4_base = xform(t_b4_base);
+
+    draw_triangle(framebuffer,win_size,t_apex_front,t_b1_front,t_b2_front,0xFF0000FF);
+    draw_triangle(framebuffer,win_size,t_apex_right,t_b2_right,t_b3_right,0xFF00FF00);
+    draw_triangle(framebuffer,win_size,t_apex_back,t_b3_back,t_b4_back,0xFFFF0000);
+    draw_triangle(framebuffer,win_size,t_apex_left,t_b4_left,t_b1_left,0xFFFFFF00);
+    draw_triangle(framebuffer,win_size,t_b1_base,t_b2_base,t_b3_base,0xFF888888);
+    draw_triangle(framebuffer,win_size,t_b1_base,t_b3_base,t_b4_base,0xFF888888);
 }
