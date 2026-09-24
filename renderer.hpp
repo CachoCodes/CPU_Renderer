@@ -235,6 +235,7 @@ struct task {
 
 
 bool debug_mode = true;
+bool show_depth = false;
 
 uint32_t *framebuffer = nullptr;
 float *depth_buffer = nullptr;
@@ -361,11 +362,11 @@ inline argb_color fragment_shader(const fragment_shader_data &data)
     argb_color frag_color;
 
     frag_color = texture_mapping({data.u, data.v}, image, width, height);
-    // frag_color.r = (frag_color.r * data.r) / 255;
-    // frag_color.g = (frag_color.g * data.g) / 255;
-    // frag_color.b = (frag_color.b * data.b) / 255;
+    //frag_color.r = (frag_color.r * data.r) / 255;
+    //frag_color.g = (frag_color.g * data.g) / 255;
+    //frag_color.b = (frag_color.b * data.b) / 255;
 
-    // frag_color = {255, data.r,data.g,data.b};
+    //frag_color = {255, data.r,data.g,data.b};
     return frag_color;
 }
 
@@ -421,12 +422,11 @@ void draw_triangle(uint32_t *framebuffer, vec2i win_size, const vertex &p0, cons
                 continue;
             }
 
-            // --- test de profundidad ---
             float depth = w0 * p0.position.z + w1 * p1.position.z + w2 * p2.position.z;
 
             int idx = y * win_size.x + x;
             if (depth >= depth_buffer[idx])
-                continue; // ya hay algo más cerca dibujado en este pixel
+                continue; 
 
             depth_buffer[idx] = depth;
 
@@ -488,7 +488,7 @@ void init_render()
     if (!image)
     {
         std::cout << stbi_failure_reason() << "\n";
-        throw std::runtime_error("shit");
+        throw std::runtime_error("Image Not Found (Make sure its in the same directory from where the file is running)");
     }
 
     char buffer[128];
@@ -505,22 +505,22 @@ void render_loop(uint32_t *framebuffer, vec2i win_size)
     clear_z_buffer();
     fill_rect(framebuffer, win_size, 0x00000000);
 
-    vertex t_apex_front = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
-    vertex t_b1_front = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 255},0.0f,1.0f};
-    vertex t_b2_front = {{0.5f, -0.5f, -0.5f},{255, 255, 255, 255},1.0f,1.0f};
-    vertex t_apex_right = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
-    vertex t_b2_right = {{0.5f, -0.5f, -0.5f},{255, 255, 255, 255},0.0f,1.0f};
-    vertex t_b3_right = {{0.5f, -0.5f, 0.5f},{255, 255, 255, 255},1.0f,1.0f};
-    vertex t_apex_back = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
-    vertex t_b3_back = {{0.5f, -0.5f, 0.5f},{255, 255, 255, 255},0.0f,1.0f};
-    vertex t_b4_back = {{-0.5f, -0.5f, 0.5f},{255, 255, 255, 255},1.0f,1.0f};
-    vertex t_apex_left = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};
-    vertex t_b4_left = {{-0.5f, -0.5f, 0.5f},{255, 255, 255, 255},0.0f,1.0f};
-    vertex t_b1_left = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 255},1.0f,1.0f};
-    vertex t_b1_base = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 255},0.0f,0.0f};
-    vertex t_b2_base = {{0.5f, -0.5f, -0.5f},{255, 255, 255, 255},1.0f,0.0f};
-    vertex t_b3_base = {{0.5f, -0.5f, 0.5f},{255, 255, 255, 255},1.0f,1.0f};
-    vertex t_b4_base = {{-0.5f, -0.5f, 0.5f}, {255, 255, 255, 255}, 0.0f, 1.0f};
+    vertex t_apex_front = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};   // white
+    vertex t_b1_front = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 0},0.0f,1.0f};    // yellow
+    vertex t_b2_front = {{0.5f, -0.5f, -0.5f},{255, 0, 255, 0},1.0f,1.0f};       // green
+    vertex t_apex_right = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};   // white
+    vertex t_b2_right = {{0.5f, -0.5f, -0.5f},{255, 0, 255, 0},0.0f,1.0f};       // green
+    vertex t_b3_right = {{0.5f, -0.5f, 0.5f},{255, 0, 0, 255},1.0f,1.0f};        // blue
+    vertex t_apex_back = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};    // white
+    vertex t_b3_back = {{0.5f, -0.5f, 0.5f},{255, 0, 0, 255},0.0f,1.0f};         // blue
+    vertex t_b4_back = {{-0.5f, -0.5f, 0.5f},{255, 255, 0, 0},1.0f,1.0f};        // red
+    vertex t_apex_left = {{0.0f, 0.5f, 0.0f},{255, 255, 255, 255},0.5f,0.0f};    // white
+    vertex t_b4_left = {{-0.5f, -0.5f, 0.5f},{255, 255, 0, 0},0.0f,1.0f};        // red
+    vertex t_b1_left = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 0},1.0f,1.0f};     // yellow
+    vertex t_b1_base = {{-0.5f, -0.5f, -0.5f},{255, 255, 255, 0},0.0f,0.0f};     // yellow
+    vertex t_b2_base = {{0.5f, -0.5f, -0.5f},{255, 0, 255, 0},1.0f,0.0f};        // green
+    vertex t_b3_base = {{0.5f, -0.5f, 0.5f},{255, 0, 0, 255},1.0f,1.0f};         // blue
+    vertex t_b4_base = {{-0.5f, -0.5f, 0.5f},{255, 255, 0, 0},0.0f,1.0f}; 
 
     static float angle = 0.0f;
     angle += 60.0f * delta;
@@ -565,4 +565,7 @@ void render_loop(uint32_t *framebuffer, vec2i win_size)
     draw_triangle(framebuffer,win_size,t_apex_left,t_b4_left,t_b1_left,0xFFFFFF00);
     draw_triangle(framebuffer,win_size,t_b1_base,t_b2_base,t_b3_base,0xFF888888);
     draw_triangle(framebuffer,win_size,t_b1_base,t_b3_base,t_b4_base,0xFF888888);
+
+    if (show_depth)
+        visualize_depth_buffer(framebuffer, win_size);
 }

@@ -53,8 +53,13 @@ LRESULT CALLBACK window_proc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
             PostQuitMessage(0);
             return 0;
 
+        case WM_KEYDOWN:
+            if (wParam == 'D')
+                show_depth = !show_depth;
+            return 0;
         default:
             return DefWindowProc(hwnd, msg, wParam, lParam);
+
     }
 }
 
